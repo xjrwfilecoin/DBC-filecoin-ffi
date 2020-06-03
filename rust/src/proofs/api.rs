@@ -681,7 +681,10 @@ pub unsafe extern "C" fn fil_verify_window_post(
             let web_data = match to_web_public_replica_info_map(replicas_ptr, replicas_len) {
                 Ok(replicas) => {
                     let post_proofs = c_to_rust_post_proofs(proofs_ptr, proofs_len).unwrap();
-                    let proofs: Vec<u8> = post_proofs.iter().flat_map(|pp| pp.clone().proof).collect();
+                    let proofs: Vec<(RegisteredPoStProof, Vec<u8>)> = post_proofs
+                        .iter()
+                        .map(|x| (x.registered_proof, x.proof.clone()))
+                        .collect();
 
                     post_data::VerifyWindowPostData {
                         randomness: randomness.inner,
