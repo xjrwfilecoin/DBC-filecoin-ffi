@@ -42,7 +42,7 @@ reqwest = { version = "^0.10", features = ["blocking", "json"] }
 
 [dependencies.filecoin-proofs-api]
 package = "filecoin-proofs-api"
-version = "3.0.0"
+version = "4.0.0"
 
 [dependencies.filecoin-webapi]
 git = "https://github.com/sbwtw/Filecoin-webapi"
