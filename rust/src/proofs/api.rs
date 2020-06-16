@@ -1,7 +1,7 @@
 use ffi_toolkit::{
     c_str_to_pbuf, c_str_to_rust_str, catch_panic_response, raw_ptr, rust_str_to_c_str, FCPResponseStatus,
 };
-use filecoin_proofs_api::seal::{SealCommitPhase1Output, SealPreCommitPhase2Output};
+use filecoin_proofs_api::seal::{SealCommitPhase1Output, SealCommitPhase2Output, SealPreCommitPhase2Output};
 use filecoin_proofs_api::{
     PaddedBytesAmount, PieceInfo, RegisteredPoStProof, RegisteredSealProof, SectorId, SnarkProof, UnpaddedByteIndex,
     UnpaddedBytesAmount,
@@ -350,19 +350,43 @@ pub unsafe extern "C" fn fil_seal_commit_phase2(
         ))
         .map_err(Into::into);
 
-        let result = scp1o
-            .and_then(|o| filecoin_proofs_api::seal::seal_commit_phase2(o, prover_id.inner, SectorId::from(sector_id)));
+        if env::var("DISABLE_WEBAPI").is_err() {
+            let web_data = seal_data::SealCommitPhase2Data {
+                phase1_output: scp1o.unwrap(),
+                prover_id: prover_id.inner,
+                sector_id: SectorId::from(sector_id),
+            };
+            let r = webapi_post_polling!("seal/seal_commit_phase2", &web_data);
+            info!("response: {:?}", r);
 
-        match result {
-            Ok(output) => {
-                response.status_code = FCPResponseStatus::FCPNoError;
-                response.proof_ptr = output.proof.as_ptr();
-                response.proof_len = output.proof.len();
-                mem::forget(output.proof);
-            }
-            Err(err) => {
+            if let Err(e) = r {
                 response.status_code = FCPResponseStatus::FCPUnclassifiedError;
-                response.error_msg = rust_str_to_c_str(format!("{:?}", err));
+                response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+                return raw_ptr(response);
+            }
+
+            let r = r.unwrap();
+            let output: SealCommitPhase2Output = serde_json::from_value(r.get("Ok").unwrap().clone()).unwrap();
+            response.status_code = FCPResponseStatus::FCPNoError;
+            response.proof_ptr = output.proof.as_ptr();
+            response.proof_len = output.proof.len();
+            mem::forget(output.proof);
+        } else {
+            let result = scp1o.and_then(|o| {
+                filecoin_proofs_api::seal::seal_commit_phase2(o, prover_id.inner, SectorId::from(sector_id))
+            });
+
+            match result {
+                Ok(output) => {
+                    response.status_code = FCPResponseStatus::FCPNoError;
+                    response.proof_ptr = output.proof.as_ptr();
+                    response.proof_len = output.proof.len();
+                    mem::forget(output.proof);
+                }
+                Err(err) => {
+                    response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+                    response.error_msg = rust_str_to_c_str(format!("{:?}", err));
+                }
             }
         }
 

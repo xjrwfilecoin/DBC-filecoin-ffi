@@ -1,7 +1,7 @@
 use std::{fs, thread, time};
 
 use filecoin_webapi::polling::PollingState;
-use reqwest::blocking::{Client, RequestBuilder};
+use reqwest::blocking::Client;
 use serde::ser::Serialize;
 use serde_json::value::from_value;
 use serde_json::{json, Value};
@@ -50,8 +50,6 @@ pub(crate) fn webapi_post_polling<T: Serialize + ?Sized>(path: &str, json: &T) -
         let time = time::Duration::from_millis(30);
         thread::sleep(time);
     }
-
-    unreachable!()
 }
 
 macro_rules! webapi_post {
