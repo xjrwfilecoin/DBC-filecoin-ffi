@@ -30,6 +30,7 @@ pub(crate) fn webapi_post<T: Serialize + ?Sized>(path: &str, json: &T) -> Result
 
 pub(crate) fn webapi_post_polling<T: Serialize + ?Sized>(path: &str, json: &T) -> Result<Value, String> {
     let state: PollingState = from_value(webapi_post(path, json)?).map_err(|e| format!("{:?}", e))?;
+    info!("webapi_post_polling request state: {:?}", state);
     let proc_id = match state {
         PollingState::Started(val) => val,
         _ => {
@@ -40,6 +41,7 @@ pub(crate) fn webapi_post_polling<T: Serialize + ?Sized>(path: &str, json: &T) -
     loop {
         let poll_state: PollingState =
             from_value(webapi_post("sys/query_state", &json!(proc_id))?).map_err(|e| format!("{:?}", e))?;
+        trace!("webapi_post_polling poll_state: {:?}", poll_state);
         match poll_state {
             PollingState::Done(result) => return Ok(result),
             PollingState::Pending => {}
