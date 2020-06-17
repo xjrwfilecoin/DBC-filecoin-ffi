@@ -1,6 +1,7 @@
 use std::{fs, thread, time};
 
 use filecoin_webapi::polling::PollingState;
+use log::{info, trace};
 use reqwest::blocking::Client;
 use serde::ser::Serialize;
 use serde_json::value::from_value;
