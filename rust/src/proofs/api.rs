@@ -265,6 +265,27 @@ pub unsafe extern "C" fn fil_seal_commit_phase1(
                 },
             };
 
+            // upload t_aux to remote
+            match webapi_upload(format!("{}/t_aux", cache_path)) {
+                Ok(f) => {},
+                Err(e) => {
+                    warn!("webapi_upload failed: {:?}", e);
+                    response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+                    response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+                    return raw_ptr(response);
+                },
+            };
+            // upload p_aux to remote
+            match webapi_upload(format!("{}/p_aux", cache_path)) {
+                Ok(f) => {},
+                Err(e) => {
+                    warn!("webapi_upload failed: {:?}", e);
+                    response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+                    response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+                    return raw_ptr(response);
+                },
+            };
+
             let public_pieces: Vec<WebPieceInfo> = from_raw_parts(pieces_ptr, pieces_len)
                 .iter()
                 .cloned()
@@ -273,7 +294,7 @@ pub unsafe extern "C" fn fil_seal_commit_phase1(
                 .collect();
 
             let web_data = seal_data::SealCommitPhase1Data {
-                cache_path,
+                cache_path: "/tmp/upload/".to_owned(),
                 replica_path: upload_file,
                 prover_id: prover_id.inner,
                 sector_id: SectorId::from(sector_id),
