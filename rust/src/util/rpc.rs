@@ -69,7 +69,7 @@ pub(crate) fn webapi_post_polling<T: Serialize + ?Sized>(path: &str, json: &T) -
         }
 
         // sleep 30s
-        let time = time::Duration::from_millis(30);
+        let time = time::Duration::from_secs(30);
         thread::sleep(time);
     }
 }
