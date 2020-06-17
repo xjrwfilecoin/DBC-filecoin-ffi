@@ -7,9 +7,10 @@ use filecoin_proofs_api::{
     UnpaddedBytesAmount,
 };
 use filecoin_webapi::*;
-use log::{warn, info};
+use log::{warn, info, trace};
 use std::env;
 use std::mem;
+use std::fs;
 use std::path::PathBuf;
 use std::slice::from_raw_parts;
 
@@ -252,32 +253,27 @@ pub unsafe extern "C" fn fil_seal_commit_phase1(
         };
 
         if env::var("DISABLE_WEBAPI").is_err() {
-            // upload replica to remote
             let replica_file = c_str_to_rust_str(replica_path).to_string();
             let cache_path = c_str_to_rust_str(cache_dir_path).to_string();
+
+            // upload all files in cache dir
+            for path in fs::read_dir(cache_path).unwrap() {
+                trace!("uploading file: {:?}", path);
+
+                match webapi_upload(format!("{}", path.unwrap().path().display())) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        warn!("webapi_upload failed: {:?}", e);
+                        response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+                        response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+                        return raw_ptr(response);
+                    },
+                };
+            }
+
+            // upload replica to remote
             let upload_file = match webapi_upload(replica_file) {
                 Ok(f) => f,
-                Err(e) => {
-                    warn!("webapi_upload failed: {:?}", e);
-                    response.status_code = FCPResponseStatus::FCPUnclassifiedError;
-                    response.error_msg = rust_str_to_c_str(format!("{:?}", e));
-                    return raw_ptr(response);
-                },
-            };
-
-            // upload t_aux to remote
-            match webapi_upload(format!("{}/t_aux", cache_path)) {
-                Ok(f) => {},
-                Err(e) => {
-                    warn!("webapi_upload failed: {:?}", e);
-                    response.status_code = FCPResponseStatus::FCPUnclassifiedError;
-                    response.error_msg = rust_str_to_c_str(format!("{:?}", e));
-                    return raw_ptr(response);
-                },
-            };
-            // upload p_aux to remote
-            match webapi_upload(format!("{}/p_aux", cache_path)) {
-                Ok(f) => {},
                 Err(e) => {
                     warn!("webapi_upload failed: {:?}", e);
                     response.status_code = FCPResponseStatus::FCPUnclassifiedError;
