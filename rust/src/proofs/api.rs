@@ -7,7 +7,7 @@ use filecoin_proofs_api::{
     UnpaddedBytesAmount,
 };
 use filecoin_webapi::*;
-use log::info;
+use log::{warn, info};
 use std::env;
 use std::mem;
 use std::path::PathBuf;
@@ -19,6 +19,7 @@ use super::helpers::{
 use super::types::*;
 use crate::proofs::helpers::to_web_public_replica_info_map;
 use crate::util::api::init_log;
+use crate::util::rpc::webapi_upload;
 use filecoin_webapi::types::{WebPieceInfo, WebPrivateReplica, WebPrivateReplicas};
 use serde_json::from_value;
 // use crate::util::rpc::post_builder;
@@ -251,6 +252,19 @@ pub unsafe extern "C" fn fil_seal_commit_phase1(
         };
 
         if env::var("DISABLE_WEBAPI").is_err() {
+            // upload replica to remote
+            let replica_file = c_str_to_rust_str(replica_path).to_string();
+            let cache_path = c_str_to_rust_str(cache_dir_path).to_string();
+            let upload_file = match webapi_upload(replica_file) {
+                Ok(f) => f,
+                Err(e) => {
+                    warn!("webapi_upload failed: {:?}", e);
+                    response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+                    response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+                    return raw_ptr(response);
+                },
+            };
+
             let public_pieces: Vec<WebPieceInfo> = from_raw_parts(pieces_ptr, pieces_len)
                 .iter()
                 .cloned()
@@ -259,8 +273,8 @@ pub unsafe extern "C" fn fil_seal_commit_phase1(
                 .collect();
 
             let web_data = seal_data::SealCommitPhase1Data {
-                cache_path: c_str_to_rust_str(cache_dir_path).to_string(),
-                replica_path: c_str_to_rust_str(replica_path).to_string(),
+                cache_path: String::new(),
+                replica_path: upload_file,
                 prover_id: prover_id.inner,
                 sector_id: SectorId::from(sector_id),
                 ticket: ticket.inner,

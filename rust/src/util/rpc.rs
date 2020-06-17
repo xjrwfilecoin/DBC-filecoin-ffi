@@ -1,8 +1,11 @@
 use std::{fs, thread, time};
+use std::fs::File;
+use std::io::Read;
 
 use filecoin_webapi::polling::PollingState;
 use log::{info, trace};
 use reqwest::blocking::Client;
+use reqwest::blocking::multipart::{Form};
 use serde::ser::Serialize;
 use serde_json::value::from_value;
 use serde_json::{json, Value};
@@ -10,6 +13,22 @@ use serde_json::{json, Value};
 lazy_static! {
     static ref REQWEST_CLIENT: Client = Client::new();
     static ref HOST: String = fs::read_to_string("/etc/filecoin-webapi.conf").unwrap();
+}
+
+pub(crate) fn webapi_upload<F: AsRef<str>>(file: F) -> Result<String, String> {
+    let mut f = File::open(file.as_ref()).map_err(|e| format!("{:?}", e))?;
+    let mut buf = vec![];
+    f.read_to_end(&mut buf).map_err(|e| format!("{:?}", e))?;
+
+    let form = Form::new().file("webapi_upload", file.as_ref()).map_err(|e| format!("{:?}", e))?;
+    let post = REQWEST_CLIENT.post(&format!("http://{}/sys/upload_file", &*HOST));
+    let response = post.multipart(form).send()
+        .map_err(|e| format!("{:?}", e))?
+        .text()
+        .map_err(|e| format!("{:?}", e))?;
+    let upload_file: Option<String> = serde_json::from_str(&response).map_err(|e| format!("{:?}", e))?;
+
+    upload_file.ok_or("None".to_string())
 }
 
 pub(crate) fn webapi_post<T: Serialize + ?Sized>(path: &str, json: &T) -> Result<Value, String> {
