@@ -273,7 +273,7 @@ pub unsafe extern "C" fn fil_seal_commit_phase1(
                 .collect();
 
             let web_data = seal_data::SealCommitPhase1Data {
-                cache_path: String::new(),
+                cache_path,
                 replica_path: upload_file,
                 prover_id: prover_id.inner,
                 sector_id: SectorId::from(sector_id),
