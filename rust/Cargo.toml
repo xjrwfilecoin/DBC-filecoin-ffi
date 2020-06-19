@@ -1,13 +1,8 @@
 [package]
 name = "filcrypto"
 description = "FFI Interface to Filecoin Proofs"
-<<<<<<< HEAD
 version = "0.7.3"
 authors = ["laser <l@s3r.com>", "sbw <sbw@sbw.so>"]
-=======
-version = "0.7.4"
-authors = ["laser <l@s3r.com>"]
->>>>>>> d56bf85... fix: update to filecoin-proofs-api v3.0.0
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/sbwtw/filecoin-ffi"
 readme = "README.md"
