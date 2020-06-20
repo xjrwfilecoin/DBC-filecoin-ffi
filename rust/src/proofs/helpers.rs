@@ -20,26 +20,26 @@ struct PublicReplicaInfoTmp {
     pub sector_id: u64,
 }
 
-pub unsafe fn to_web_public_replica_info_map(
-    replicas_ptr: *const fil_PublicReplicaInfo,
-    replicas_len: libc::size_t,
-) -> Result<WebPublicReplicas> {
-    use rayon::prelude::*;
-
-    ensure!(!replicas_ptr.is_null(), "replicas_ptr must not be null");
-
-    let mut replicas = Vec::new();
-
-    for ffi_info in from_raw_parts(replicas_ptr, replicas_len) {
-        replicas.push(WebPublicReplica {
-            sector_id: ffi_info.sector_id.into(),
-            public_replica_info: WebPublicReplicaInfo {
-                registered_proof: ffi_info.registered_proof.into(),
-                comm_r: ffi_info.comm_r,
-                sector_id: ffi_info.sector_id.into(),
-            },
-        });
-    }
+// pub unsafe fn to_web_public_replica_info_map(
+//     replicas_ptr: *const fil_PublicReplicaInfo,
+//     replicas_len: libc::size_t,
+// ) -> Result<WebPublicReplicas> {
+//     use rayon::prelude::*;
+//
+//     ensure!(!replicas_ptr.is_null(), "replicas_ptr must not be null");
+//
+//     let mut replicas = Vec::new();
+//
+//     for ffi_info in from_raw_parts(replicas_ptr, replicas_len) {
+//         replicas.push(WebPublicReplica {
+//             sector_id: ffi_info.sector_id.into(),
+//             public_replica_info: WebPublicReplicaInfo {
+//                 registered_proof: ffi_info.registered_proof.into(),
+//                 comm_r: ffi_info.comm_r,
+//                 sector_id: ffi_info.sector_id.into(),
+//             },
+//         });
+//     }
 
     // let map = replicas
     //     .into_par_iter()
@@ -57,8 +57,8 @@ pub unsafe fn to_web_public_replica_info_map(
     //     })
     //     .collect();
 
-    Ok(WebPublicReplicas(replicas))
-}
+//     Ok(WebPublicReplicas(replicas))
+// }
 
 #[allow(clippy::type_complexity)]
 pub unsafe fn to_public_replica_info_map(
@@ -107,32 +107,32 @@ struct PrivateReplicaInfoTmp {
     pub sector_id: u64,
 }
 
-pub unsafe fn to_web_private_replica_info_map(
-    replicas_ptr: *const fil_PrivateReplicaInfo,
-    replicas_len: libc::size_t,
-) -> Result<WebPrivateReplicas> {
-    use rayon::prelude::*;
-
-    ensure!(!replicas_ptr.is_null(), "replicas_ptr must not be null");
-
-    let replicas: Vec<_> = from_raw_parts(replicas_ptr, replicas_len)
-        .iter()
-        .map(|ffi_info| {
-            let cache_dir_path = c_str_to_rust_str(ffi_info.cache_dir_path);
-            let replica_path = c_str_to_rust_str(ffi_info.replica_path).to_string();
-
-            WebPrivateReplica {
-                sector_id: ffi_info.sector_id.into(),
-
-                private_replica_info: WebPrivateReplicaInfo {
-                    registered_proof: ffi_info.registered_proof.into(),
-                    cache_dir: cache_dir_path.into_owned(),
-                    comm_r: ffi_info.comm_r,
-                    replica_path,
-                },
-            }
-        })
-        .collect();
+// pub unsafe fn to_web_private_replica_info_map(
+//     replicas_ptr: *const fil_PrivateReplicaInfo,
+//     replicas_len: libc::size_t,
+// ) -> Result<WebPrivateReplicas> {
+//     use rayon::prelude::*;
+//
+//     ensure!(!replicas_ptr.is_null(), "replicas_ptr must not be null");
+//
+//     let replicas: Vec<_> = from_raw_parts(replicas_ptr, replicas_len)
+//         .iter()
+//         .map(|ffi_info| {
+//             let cache_dir_path = c_str_to_rust_str(ffi_info.cache_dir_path);
+//             let replica_path = c_str_to_rust_str(ffi_info.replica_path).to_string();
+//
+//             WebPrivateReplica {
+//                 sector_id: ffi_info.sector_id.into(),
+//
+//                 private_replica_info: WebPrivateReplicaInfo {
+//                     registered_proof: ffi_info.registered_proof.into(),
+//                     cache_dir: cache_dir_path.into_owned(),
+//                     comm_r: ffi_info.comm_r,
+//                     replica_path,
+//                 },
+//             }
+//         })
+//         .collect();
 
     // let map = replicas
     //     .into_par_iter()
@@ -157,8 +157,8 @@ pub unsafe fn to_web_private_replica_info_map(
     //     })
     //     .collect();
 
-    Ok(WebPrivateReplicas(replicas))
-}
+//     Ok(WebPrivateReplicas(replicas))
+// }
 
 pub unsafe fn to_private_replica_info_map(
     replicas_ptr: *const fil_PrivateReplicaInfo,

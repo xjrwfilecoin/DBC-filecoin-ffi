@@ -15,14 +15,14 @@ use std::path::PathBuf;
 use std::slice::from_raw_parts;
 
 use super::helpers::{
-    c_to_rust_post_proofs, to_private_replica_info_map, to_public_replica_info_map, to_web_private_replica_info_map,
+    c_to_rust_post_proofs, to_private_replica_info_map, to_public_replica_info_map,
 };
 use super::types::*;
-use crate::proofs::helpers::to_web_public_replica_info_map;
+// use crate::proofs::helpers::to_web_public_replica_info_map;
 use crate::util::api::init_log;
 use crate::util::rpc::webapi_upload;
 use filecoin_webapi::types::{WebPieceInfo, WebPrivateReplica, WebPrivateReplicas};
-use serde_json::from_value;
+use serde_json::{json, Value, from_value};
 // use crate::util::rpc::post_builder;
 
 /// TODO: document
@@ -387,7 +387,8 @@ pub unsafe extern "C" fn fil_seal_commit_phase2(
                 prover_id: prover_id.inner,
                 sector_id: SectorId::from(sector_id),
             };
-            let r = webapi_post_polling!("seal/seal_commit_phase2", &web_data);
+            let json_data = json!(web_data);
+            let r = webapi_post_polling!("seal/seal_commit_phase2", &json_data);
             info!("response: {:?}", r);
 
             if let Err(e) = r {

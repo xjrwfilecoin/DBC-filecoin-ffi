@@ -41,7 +41,7 @@ version = "4.0.0"
 
 [dependencies.filecoin-webapi]
 git = "https://github.com/sbwtw/Filecoin-webapi"
-rev = "f640ec0"
+rev = "81a1568"
 #path = "../../Filecoin-webapi"
 
 [build-dependencies]
