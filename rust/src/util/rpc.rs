@@ -68,8 +68,8 @@ pub(crate) fn webapi_post_polling<T: Serialize + ?Sized>(path: &str, json: &T) -
             e @ _ => return Err(format!("poll_state error: {:?}", e)),
         }
 
-        // sleep 10s
-        let time = time::Duration::from_secs(10);
+        // sleep 30s
+        let time = time::Duration::from_secs(30);
         thread::sleep(time);
     }
 }
