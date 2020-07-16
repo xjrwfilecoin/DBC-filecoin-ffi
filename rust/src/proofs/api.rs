@@ -115,6 +115,41 @@ pub unsafe extern "C" fn fil_write_without_alignment(
         raw_ptr(response)
     })
 }
+#[no_mangle]
+pub unsafe extern "C" fn fil_fauxrep(
+    registered_proof: fil_RegisteredSealProof,
+    cache_dir_path: *const libc::c_char,
+    sealed_sector_path: *const libc::c_char,
+) -> *mut fil_FauxRepResponse {
+    catch_panic_response(|| {
+        init_log();
+
+        info!("fauxrep: start");
+
+        let mut response: fil_FauxRepResponse = Default::default();
+
+        let result = filecoin_proofs_api::seal::fauxrep(
+            registered_proof.into(),
+            c_str_to_pbuf(cache_dir_path),
+            c_str_to_pbuf(sealed_sector_path),
+        );
+
+        match result {
+            Ok(output) => {
+                response.status_code = FCPResponseStatus::FCPNoError;
+                response.commitment = output;
+            }
+            Err(err) => {
+                response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+                response.error_msg = rust_str_to_c_str(format!("{:?}", err));
+            }
+        }
+
+        info!("fauxrep: finish");
+
+        raw_ptr(response)
+    })
+}
 
 /// TODO: document
 ///

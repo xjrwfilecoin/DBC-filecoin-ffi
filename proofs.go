@@ -17,7 +17,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/pkg/errors"
 
-	"github.com/sbwtw/filecoin-ffi/generated"
+	"github.com/filecoin-project/filecoin-ffi/generated"
 )
 
 // VerifySeal returns true if the sealing operation from which its inputs were
@@ -636,6 +636,24 @@ func ClearCache(sectorSize uint64, cacheDirPath string) error {
 	}
 
 	return nil
+}
+
+func FauxRep(proofType abi.RegisteredSealProof, cacheDirPath string, sealedSectorPath string) (cid.Cid, error) {
+	sp, err := toFilRegisteredSealProof(proofType)
+	if err != nil {
+		return cid.Undef, err
+	}
+
+	resp := generated.FilFauxrep(sp, cacheDirPath, sealedSectorPath)
+	resp.Deref()
+
+	defer generated.FilDestroyFauxrepResponse(resp)
+
+	if resp.StatusCode != generated.FCPResponseStatusFCPNoError {
+		return cid.Undef, errors.New(generated.RawString(resp.ErrorMsg).Copy())
+	}
+
+	return commcid.ReplicaCommitmentV1ToCID(resp.Commitment[:]), nil
 }
 
 func toFilExistingPieceSizes(src []abi.UnpaddedPieceSize) ([]uint64, uint) {
