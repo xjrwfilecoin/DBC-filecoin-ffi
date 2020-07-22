@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	ffi "github.com/sbwtw/filecoin-ffi"
+	ffi "github.com/filecoin-project/filecoin-ffi"
 )
 
 func main() {
