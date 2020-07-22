@@ -1,24 +1,34 @@
 use ffi_toolkit::{
-    c_str_to_pbuf, catch_panic_response, raw_ptr, rust_str_to_c_str, FCPResponseStatus,
+    c_str_to_pbuf, c_str_to_rust_str, catch_panic_response, raw_ptr, rust_str_to_c_str, FCPResponseStatus,
 };
-use filecoin_proofs_api::seal::SealPreCommitPhase2Output;
+use filecoin_proofs_api::seal::{SealCommitPhase1Output, SealCommitPhase2Output, SealPreCommitPhase2Output};
 use filecoin_proofs_api::{
-    PieceInfo, RegisteredPoStProof, RegisteredSealProof, SectorId, UnpaddedByteIndex,
+    PaddedBytesAmount, PieceInfo, RegisteredPoStProof, RegisteredSealProof, SectorId, SnarkProof, UnpaddedByteIndex,
     UnpaddedBytesAmount,
 };
-use log::info;
+use filecoin_webapi::*;
+use log::{warn, info, trace};
+use std::env;
 use std::mem;
+use std::fs;
 use std::path::PathBuf;
 use std::slice::from_raw_parts;
 
-use super::helpers::{c_to_rust_post_proofs, to_private_replica_info_map};
+use super::helpers::{
+    c_to_rust_post_proofs, to_private_replica_info_map, to_public_replica_info_map,
+};
 use super::types::*;
+// use crate::proofs::helpers::to_web_public_replica_info_map;
 use crate::util::api::init_log;
+use crate::util::rpc::webapi_upload;
+use filecoin_webapi::types::{WebPieceInfo, WebPrivateReplica, WebPrivateReplicas};
+use serde_json::{json, Value, from_value};
+// use crate::util::rpc::post_builder;
 
 /// TODO: document
 ///
 #[no_mangle]
-#[cfg(not(target_os = "windows"))]
+// #[cfg(not(target_os = "windows"))]
 pub unsafe extern "C" fn fil_write_with_alignment(
     registered_proof: fil_RegisteredSealProof,
     src_fd: libc::c_int,
@@ -34,11 +44,10 @@ pub unsafe extern "C" fn fil_write_with_alignment(
 
         let mut response = fil_WriteWithAlignmentResponse::default();
 
-        let piece_sizes: Vec<UnpaddedBytesAmount> =
-            from_raw_parts(existing_piece_sizes_ptr, existing_piece_sizes_len)
-                .iter()
-                .map(|n| UnpaddedBytesAmount(*n))
-                .collect();
+        let piece_sizes: Vec<UnpaddedBytesAmount> = from_raw_parts(existing_piece_sizes_ptr, existing_piece_sizes_len)
+            .iter()
+            .map(|n| UnpaddedBytesAmount(*n))
+            .collect();
 
         let n = UnpaddedBytesAmount(src_size);
 
@@ -70,7 +79,7 @@ pub unsafe extern "C" fn fil_write_with_alignment(
 /// TODO: document
 ///
 #[no_mangle]
-#[cfg(not(target_os = "windows"))]
+// #[cfg(not(target_os = "windows"))]
 pub unsafe extern "C" fn fil_write_without_alignment(
     registered_proof: fil_RegisteredSealProof,
     src_fd: libc::c_int,
@@ -279,35 +288,108 @@ pub unsafe extern "C" fn fil_seal_commit_phase1(
             comm_d: comm_d.inner,
         };
 
-        let public_pieces: Vec<PieceInfo> = from_raw_parts(pieces_ptr, pieces_len)
-            .iter()
-            .cloned()
-            .map(Into::into)
-            .collect();
+        // if env::var("DISABLE_WEBAPI").is_err() {
+        //     let replica_file = c_str_to_rust_str(replica_path).to_string();
+        //     let cache_path = c_str_to_rust_str(cache_dir_path).to_string();
+        //
+        //     // upload all files in cache dir
+        //     for path in fs::read_dir(cache_path).unwrap() {
+        //         trace!("uploading file: {:?}", path);
+        //
+        //         match webapi_upload(format!("{}", path.unwrap().path().display())) {
+        //             Ok(f) => f,
+        //             Err(e) => {
+        //                 warn!("webapi_upload failed: {:?}", e);
+        //                 response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //                 response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+        //                 return raw_ptr(response);
+        //             },
+        //         };
+        //     }
+        //
+        //     // upload replica to remote
+        //     let upload_file = match webapi_upload(replica_file) {
+        //         Ok(f) => f,
+        //         Err(e) => {
+        //             warn!("webapi_upload failed: {:?}", e);
+        //             response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //             response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+        //             return raw_ptr(response);
+        //         },
+        //     };
+        //
+        //     let public_pieces: Vec<WebPieceInfo> = from_raw_parts(pieces_ptr, pieces_len)
+        //         .iter()
+        //         .cloned()
+        //         .map(Into::into)
+        //         .map(|x| WebPieceInfo::from_object(x))
+        //         .collect();
+        //
+        //     let web_data = seal_data::SealCommitPhase1Data {
+        //         cache_path: "/tmp/upload/".to_owned(),
+        //         replica_path: upload_file,
+        //         prover_id: prover_id.inner,
+        //         sector_id: SectorId::from(sector_id),
+        //         ticket: ticket.inner,
+        //         seed: seed.inner,
+        //         pre_commit: spcp2o,
+        //         piece_infos: public_pieces,
+        //     };
+        //
+        //     let r = webapi_post_polling!("seal/seal_commit_phase1", &web_data);
+        //     info!("response: {:?}", r);
+        //
+        //     if let Err(e) = r {
+        //         response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //         response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+        //         return raw_ptr(response);
+        //     }
+        //
+        //     let r = r.unwrap();
+        //     let output: SealCommitPhase1Output = serde_json::from_value(r.get("Ok").unwrap().clone()).unwrap();
+        //     match serde_json::to_vec(&output) {
+        //         Ok(output) => {
+        //             response.status_code = FCPResponseStatus::FCPNoError;
+        //             response.seal_commit_phase1_output_ptr = output.as_ptr();
+        //             response.seal_commit_phase1_output_len = output.len();
+        //             mem::forget(output);
+        //         }
+        //         Err(err) => {
+        //             response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //             response.error_msg = rust_str_to_c_str(format!("{:?}", err));
+        //         }
+        //     }
+        // } else {
+            let public_pieces: Vec<PieceInfo> = from_raw_parts(pieces_ptr, pieces_len)
+                .iter()
+                .cloned()
+                .map(Into::into)
+                .collect();
 
-        let result = filecoin_proofs_api::seal::seal_commit_phase1(
-            c_str_to_pbuf(cache_dir_path),
-            c_str_to_pbuf(replica_path),
-            prover_id.inner,
-            SectorId::from(sector_id),
-            ticket.inner,
-            seed.inner,
-            spcp2o,
-            &public_pieces,
-        );
+            let result = filecoin_proofs_api::seal::seal_commit_phase1(
+                c_str_to_pbuf(cache_dir_path),
+                c_str_to_pbuf(replica_path),
+                prover_id.inner,
+                SectorId::from(sector_id),
+                ticket.inner,
+                seed.inner,
+                spcp2o,
+                &public_pieces,
+            );
 
-        match result.and_then(|output| serde_json::to_vec(&output).map_err(Into::into)) {
-            Ok(output) => {
-                response.status_code = FCPResponseStatus::FCPNoError;
-                response.seal_commit_phase1_output_ptr = output.as_ptr();
-                response.seal_commit_phase1_output_len = output.len();
-                mem::forget(output);
+            match result.and_then(|output| serde_json::to_vec(&output).map_err(Into::into)) {
+                Ok(output) => {
+                    response.status_code = FCPResponseStatus::FCPNoError;
+                    response.seal_commit_phase1_output_ptr = output.as_ptr();
+                    response.seal_commit_phase1_output_len = output.len();
+                    mem::forget(output);
+                }
+                Err(err) => {
+                    response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+                    response.error_msg = rust_str_to_c_str(format!("{:?}", err));
+                }
             }
-            Err(err) => {
-                response.status_code = FCPResponseStatus::FCPUnclassifiedError;
-                response.error_msg = rust_str_to_c_str(format!("{:?}", err));
-            }
-        }
+        // }
 
         info!("seal_commit_phase1: finish");
 
@@ -335,24 +417,44 @@ pub unsafe extern "C" fn fil_seal_commit_phase2(
         ))
         .map_err(Into::into);
 
-        let result = scp1o.and_then(|o| {
-            filecoin_proofs_api::seal::seal_commit_phase2(
-                o,
-                prover_id.inner,
-                SectorId::from(sector_id),
-            )
-        });
+        if env::var("DISABLE_WEBAPI").is_err() {
+            let web_data = seal_data::SealCommitPhase2Data {
+                phase1_output: scp1o.unwrap(),
+                prover_id: prover_id.inner,
+                sector_id: SectorId::from(sector_id),
+            };
+            let json_data = json!(web_data);
+            let r = webapi_post_polling!("seal/seal_commit_phase2", &json_data);
+            info!("response: {:?}", r);
 
-        match result {
-            Ok(output) => {
-                response.status_code = FCPResponseStatus::FCPNoError;
-                response.proof_ptr = output.proof.as_ptr();
-                response.proof_len = output.proof.len();
-                mem::forget(output.proof);
-            }
-            Err(err) => {
+            if let Err(e) = r {
                 response.status_code = FCPResponseStatus::FCPUnclassifiedError;
-                response.error_msg = rust_str_to_c_str(format!("{:?}", err));
+                response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+                return raw_ptr(response);
+            }
+
+            let r = r.unwrap();
+            let output: SealCommitPhase2Output = serde_json::from_value(r.get("Ok").unwrap().clone()).unwrap();
+            response.status_code = FCPResponseStatus::FCPNoError;
+            response.proof_ptr = output.proof.as_ptr();
+            response.proof_len = output.proof.len();
+            mem::forget(output.proof);
+        } else {
+            let result = scp1o.and_then(|o| {
+                filecoin_proofs_api::seal::seal_commit_phase2(o, prover_id.inner, SectorId::from(sector_id))
+            });
+
+            match result {
+                Ok(output) => {
+                    response.status_code = FCPResponseStatus::FCPNoError;
+                    response.proof_ptr = output.proof.as_ptr();
+                    response.proof_len = output.proof.len();
+                    mem::forget(output.proof);
+                }
+                Err(err) => {
+                    response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+                    response.error_msg = rust_str_to_c_str(format!("{:?}", err));
+                }
             }
         }
 
@@ -493,19 +595,53 @@ pub unsafe extern "C" fn fil_verify_winning_post(
         info!("verify_winning_post: start");
 
         let mut response = fil_VerifyWinningPoStResponse::default();
-
+        // if env::var("DISABLE_WEBAPI").is_err() {
+        //     let web_data = match to_web_public_replica_info_map(replicas_ptr, replicas_len) {
+        //         Ok(replicas) => {
+        //             let post_proofs = c_to_rust_post_proofs(proofs_ptr, proofs_len).unwrap();
+        //             let proofs: Vec<u8> = post_proofs.iter().flat_map(|pp| pp.clone().proof).collect();
+        //
+        //             post_data::VerifyWinningPostData {
+        //                 randomness: randomness.inner,
+        //                 proof: proofs,
+        //                 replicas,
+        //                 prover_id: prover_id.inner,
+        //             }
+        //         }
+        //         Err(e) => {
+        //             response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //             response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+        //             return raw_ptr(response);
+        //         }
+        //     };
+        //
+        //     let r = webapi_post!("post/verify_winning_post", &web_data);
+        //     info!("response: {:?}", r);
+        //
+        //     if let Err(e) = r {
+        //         response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //         response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+        //         return raw_ptr(response);
+        //     }
+        //
+        //     let r = r.unwrap();
+        //     if let Some(e) = r.get("Err") {
+        //         response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //         response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+        //         return raw_ptr(response);
+        //     }
+        //
+        //     let is_valid: bool = serde_json::from_value(r.get("Ok").unwrap().clone()).unwrap();
+        //     response.status_code = FCPResponseStatus::FCPNoError;
+        //     response.is_valid = is_valid;
+        // } else {
         let convert = super::helpers::to_public_replica_info_map(replicas_ptr, replicas_len);
 
         let result = convert.and_then(|replicas| {
             let post_proofs = c_to_rust_post_proofs(proofs_ptr, proofs_len)?;
             let proofs: Vec<u8> = post_proofs.iter().flat_map(|pp| pp.clone().proof).collect();
 
-            filecoin_proofs_api::post::verify_winning_post(
-                &randomness.inner,
-                &proofs,
-                &replicas,
-                prover_id.inner,
-            )
+            filecoin_proofs_api::post::verify_winning_post(&randomness.inner, &proofs, &replicas, prover_id.inner)
         });
 
         match result {
@@ -518,6 +654,7 @@ pub unsafe extern "C" fn fil_verify_winning_post(
                 response.error_msg = rust_str_to_c_str(format!("{:?}", err));
             }
         };
+        // }
 
         info!("verify_winning_post: {}", "finish");
         raw_ptr(response)
@@ -539,10 +676,53 @@ pub unsafe extern "C" fn fil_generate_window_post(
         info!("generate_window_post: start");
 
         let mut response = fil_GenerateWindowPoStResponse::default();
-
-        let result = to_private_replica_info_map(replicas_ptr, replicas_len).and_then(|rs| {
-            filecoin_proofs_api::post::generate_window_post(&randomness.inner, &rs, prover_id.inner)
-        });
+        // if env::var("DISABLE_WEBAPI").is_err() {
+        //     let web_data = match to_web_private_replica_info_map(replicas_ptr, replicas_len) {
+        //         Ok(replicas) => post_data::GenerateWindowPostData {
+        //             randomness: randomness.inner,
+        //             replicas,
+        //             prover_id: prover_id.inner,
+        //         },
+        //         Err(e) => {
+        //             response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //             response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+        //             return raw_ptr(response);
+        //         }
+        //     };
+        //
+        //     let r = webapi_post!("post/generate_window_post", &web_data);
+        //     info!("response: {:?}", r);
+        //
+        //     if let Err(e) = r {
+        //         response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //         response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+        //         return raw_ptr(response);
+        //     }
+        //
+        //     let result: Vec<(RegisteredPoStProof, SnarkProof)> =
+        //         serde_json::from_value(r.unwrap().get("Ok").unwrap().clone()).unwrap();
+        //     let mapped: Vec<fil_PoStProof> = result
+        //         .iter()
+        //         .cloned()
+        //         .map(|(t, proof)| {
+        //             let out = fil_PoStProof {
+        //                 registered_proof: (t).into(),
+        //                 proof_len: proof.len(),
+        //                 proof_ptr: proof.as_ptr(),
+        //             };
+        //
+        //             mem::forget(proof);
+        //
+        //             out
+        //         })
+        //         .collect();
+        //     response.status_code = FCPResponseStatus::FCPNoError;
+        //     response.proofs_ptr = mapped.as_ptr();
+        //     response.proofs_len = mapped.len();
+        //     mem::forget(mapped);
+        // } else {
+        let result = to_private_replica_info_map(replicas_ptr, replicas_len)
+            .and_then(|rs| filecoin_proofs_api::post::generate_window_post(&randomness.inner, &rs, prover_id.inner));
 
         match result {
             Ok(output) => {
@@ -572,6 +752,7 @@ pub unsafe extern "C" fn fil_generate_window_post(
                 response.error_msg = rust_str_to_c_str(format!("{:?}", err));
             }
         }
+        // }
 
         info!("generate_window_post: finish");
 
@@ -595,6 +776,44 @@ pub unsafe extern "C" fn fil_verify_window_post(
         info!("verify_window_post: start");
 
         let mut response = fil_VerifyWindowPoStResponse::default();
+        // if env::var("DISABLE_WEBAPI").is_err() {
+        //     let web_data = match to_web_public_replica_info_map(replicas_ptr, replicas_len) {
+        //         Ok(replicas) => {
+        //             let post_proofs = c_to_rust_post_proofs(proofs_ptr, proofs_len).unwrap();
+        //             let proofs: Vec<(RegisteredPoStProof, Vec<u8>)> = post_proofs
+        //                 .iter()
+        //                 .map(|x| (x.registered_proof, x.proof.clone()))
+        //                 .collect();
+        //
+        //             post_data::VerifyWindowPostData {
+        //                 randomness: randomness.inner,
+        //                 proof: proofs,
+        //                 replicas,
+        //                 prover_id: prover_id.inner,
+        //             }
+        //         }
+        //         Err(e) => {
+        //             response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //             response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+        //             return raw_ptr(response);
+        //         }
+        //     };
+        //
+        //
+        //     let r = webapi_post!("/post/verify_window_post", &web_data);
+        //     info!("response: {:?}", r);
+        //
+        //     if let Err(e) = r {
+        //         response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //         response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+        //         return raw_ptr(response);
+        //     }
+        //
+        //     let is_valid: bool = serde_json::from_value(r.unwrap().get("Ok").unwrap().clone()).unwrap();
+        //     response.status_code = FCPResponseStatus::FCPNoError;
+        //     response.is_valid = is_valid;
+        //
+        // } else {
 
         let convert = super::helpers::to_public_replica_info_map(replicas_ptr, replicas_len);
 
@@ -606,12 +825,7 @@ pub unsafe extern "C" fn fil_verify_window_post(
                 .map(|x| (x.registered_proof, x.proof.as_ref()))
                 .collect();
 
-            filecoin_proofs_api::post::verify_window_post(
-                &randomness.inner,
-                &proofs,
-                &replicas,
-                prover_id.inner,
-            )
+            filecoin_proofs_api::post::verify_window_post(&randomness.inner, &proofs, &replicas, prover_id.inner)
         });
 
         match result {
@@ -624,6 +838,7 @@ pub unsafe extern "C" fn fil_verify_window_post(
                 response.error_msg = rust_str_to_c_str(format!("{:?}", err));
             }
         };
+        // }
 
         info!("verify_window_post: {}", "finish");
         raw_ptr(response)
@@ -692,8 +907,7 @@ pub unsafe extern "C" fn fil_generate_data_commitment(
             .map(Into::into)
             .collect();
 
-        let result =
-            filecoin_proofs_api::seal::compute_comm_d(registered_proof.into(), &public_pieces);
+        let result = filecoin_proofs_api::seal::compute_comm_d(registered_proof.into(), &public_pieces);
 
         let mut response = fil_GenerateDataCommitmentResponse::default();
 
@@ -722,8 +936,7 @@ pub unsafe extern "C" fn fil_clear_cache(
     catch_panic_response(|| {
         init_log();
 
-        let result =
-            filecoin_proofs_api::seal::clear_cache(sector_size, &c_str_to_pbuf(cache_dir_path));
+        let result = filecoin_proofs_api::seal::clear_cache(sector_size, &c_str_to_pbuf(cache_dir_path));
 
         let mut response = fil_ClearCacheResponse::default();
 
@@ -753,15 +966,42 @@ pub unsafe extern "C" fn fil_generate_winning_post_sector_challenge(
     catch_panic_response(|| {
         init_log();
 
+        let proof_type = registered_proof.into();
+        let randomness = randomness.inner;
+        let prover_id = prover_id.inner;
+
         info!("generate_winning_post_sector_challenge: start");
-
         let mut response = fil_GenerateWinningPoStSectorChallenge::default();
-
+        // if env::var("DISABLE_WEBAPI").is_err() {
+        //     let web_data = post_data::GenerateWinningPostSectorChallengeData {
+        //         proof_type,
+        //         randomness,
+        //         sector_set_len,
+        //         prover_id,
+        //     };
+        //
+        //     let r = webapi_post!("post/generate_winning_post_sector_challenge", &web_data);
+        //     info!("response: {:?}", r);
+        //
+        //     match r {
+        //         Ok(value) => {
+        //             let mapped: Vec<u64> = serde_json::from_value(value.get("Ok").unwrap().clone()).unwrap();
+        //             response.status_code = FCPResponseStatus::FCPNoError;
+        //             response.ids_ptr = mapped.as_ptr();
+        //             response.ids_len = mapped.len();
+        //             mem::forget(mapped);
+        //         }
+        //         Err(error) => {
+        //             response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //             response.error_msg = rust_str_to_c_str(error);
+        //         }
+        //     }
+        // } else {
         let result = filecoin_proofs_api::post::generate_winning_post_sector_challenge(
-            registered_proof.into(),
-            &randomness.inner,
+            proof_type,
+            &randomness,
             sector_set_len,
-            prover_id.inner,
+            prover_id,
         );
 
         match result {
@@ -778,6 +1018,7 @@ pub unsafe extern "C" fn fil_generate_winning_post_sector_challenge(
                 response.error_msg = rust_str_to_c_str(format!("{:?}", err));
             }
         }
+        // }
 
         info!("generate_winning_post_sector_challenge: finish");
 
@@ -798,16 +1039,56 @@ pub unsafe extern "C" fn fil_generate_winning_post(
         init_log();
 
         info!("generate_winning_post: start");
-
         let mut response = fil_GenerateWinningPoStResponse::default();
-
-        let result = to_private_replica_info_map(replicas_ptr, replicas_len).and_then(|rs| {
-            filecoin_proofs_api::post::generate_winning_post(
-                &randomness.inner,
-                &rs,
-                prover_id.inner,
-            )
-        });
+        // if env::var("DISABLE_WEBAPI").is_err() {
+        //     let web_replicas = match to_web_private_replica_info_map(replicas_ptr, replicas_len) {
+        //         Ok(replicas) => replicas,
+        //         Err(e) => {
+        //             response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //             response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+        //             return raw_ptr(response);
+        //         }
+        //     };
+        //
+        //     let web_data = post_data::GenerateWinningPostData {
+        //         randomness: randomness.inner,
+        //         replicas: web_replicas,
+        //         prover_id: prover_id.inner,
+        //     };
+        //     let r = webapi_post!("post/generate_winning_post", &web_data);
+        //     info!("response: {:?}", r);
+        //
+        //     if let Err(e) = r {
+        //         response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+        //         response.error_msg = rust_str_to_c_str(format!("{:?}", e));
+        //         return raw_ptr(response);
+        //     }
+        //
+        //     let output: Vec<(RegisteredPoStProof, SnarkProof)> =
+        //         serde_json::from_value(r.unwrap().get("Ok").unwrap().clone()).unwrap();
+        //     let mapped: Vec<fil_PoStProof> = output
+        //         .iter()
+        //         .cloned()
+        //         .map(|(t, proof)| {
+        //             let out = fil_PoStProof {
+        //                 registered_proof: (t).into(),
+        //                 proof_len: proof.len(),
+        //                 proof_ptr: proof.as_ptr(),
+        //             };
+        //
+        //             mem::forget(proof);
+        //
+        //             out
+        //         })
+        //         .collect();
+        //
+        //     response.status_code = FCPResponseStatus::FCPNoError;
+        //     response.proofs_ptr = mapped.as_ptr();
+        //     response.proofs_len = mapped.len();
+        //     mem::forget(mapped);
+        // } else {
+        let result = to_private_replica_info_map(replicas_ptr, replicas_len)
+            .and_then(|rs| filecoin_proofs_api::post::generate_winning_post(&randomness.inner, &rs, prover_id.inner));
 
         match result {
             Ok(output) => {
@@ -837,6 +1118,7 @@ pub unsafe extern "C" fn fil_generate_winning_post(
                 response.error_msg = rust_str_to_c_str(format!("{:?}", err));
             }
         }
+        // }
 
         info!("generate_winning_post: finish");
 
@@ -845,49 +1127,38 @@ pub unsafe extern "C" fn fil_generate_winning_post(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_write_with_alignment_response(
-    ptr: *mut fil_WriteWithAlignmentResponse,
-) {
+pub unsafe extern "C" fn fil_destroy_write_with_alignment_response(ptr: *mut fil_WriteWithAlignmentResponse) {
     let _ = Box::from_raw(ptr);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_write_without_alignment_response(
-    ptr: *mut fil_WriteWithoutAlignmentResponse,
-) {
+pub unsafe extern "C" fn fil_destroy_write_without_alignment_response(ptr: *mut fil_WriteWithoutAlignmentResponse) {
     let _ = Box::from_raw(ptr);
 }
 
 #[no_mangle]
+<<<<<<< HEAD
 pub unsafe extern "C" fn fil_destroy_fauxrep_response(ptr: *mut fil_FauxRepResponse) {
     let _ = Box::from_raw(ptr);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_seal_pre_commit_phase1_response(
-    ptr: *mut fil_SealPreCommitPhase1Response,
-) {
+pub unsafe extern "C" fn fil_destroy_seal_pre_commit_phase1_response(ptr: *mut fil_SealPreCommitPhase1Response) {
     let _ = Box::from_raw(ptr);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_seal_pre_commit_phase2_response(
-    ptr: *mut fil_SealPreCommitPhase2Response,
-) {
+pub unsafe extern "C" fn fil_destroy_seal_pre_commit_phase2_response(ptr: *mut fil_SealPreCommitPhase2Response) {
     let _ = Box::from_raw(ptr);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_seal_commit_phase1_response(
-    ptr: *mut fil_SealCommitPhase1Response,
-) {
+pub unsafe extern "C" fn fil_destroy_seal_commit_phase1_response(ptr: *mut fil_SealCommitPhase1Response) {
     let _ = Box::from_raw(ptr);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_seal_commit_phase2_response(
-    ptr: *mut fil_SealCommitPhase2Response,
-) {
+pub unsafe extern "C" fn fil_destroy_seal_commit_phase2_response(ptr: *mut fil_SealCommitPhase2Response) {
     let _ = Box::from_raw(ptr);
 }
 
@@ -897,16 +1168,12 @@ pub unsafe extern "C" fn fil_destroy_unseal_range_response(ptr: *mut fil_UnsealR
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_generate_piece_commitment_response(
-    ptr: *mut fil_GeneratePieceCommitmentResponse,
-) {
+pub unsafe extern "C" fn fil_destroy_generate_piece_commitment_response(ptr: *mut fil_GeneratePieceCommitmentResponse) {
     let _ = Box::from_raw(ptr);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_generate_data_commitment_response(
-    ptr: *mut fil_GenerateDataCommitmentResponse,
-) {
+pub unsafe extern "C" fn fil_destroy_generate_data_commitment_response(ptr: *mut fil_GenerateDataCommitmentResponse) {
     let _ = Box::from_raw(ptr);
 }
 
@@ -918,9 +1185,7 @@ pub unsafe extern "C" fn fil_destroy_string_response(ptr: *mut fil_StringRespons
 /// Returns the number of user bytes that will fit into a staged sector.
 ///
 #[no_mangle]
-pub unsafe extern "C" fn fil_get_max_user_bytes_per_staged_sector(
-    registered_proof: fil_RegisteredSealProof,
-) -> u64 {
+pub unsafe extern "C" fn fil_get_max_user_bytes_per_staged_sector(registered_proof: fil_RegisteredSealProof) -> u64 {
     u64::from(UnpaddedBytesAmount::from(
         RegisteredSealProof::from(registered_proof).sector_size(),
     ))
@@ -929,9 +1194,7 @@ pub unsafe extern "C" fn fil_get_max_user_bytes_per_staged_sector(
 /// Returns the CID of the Groth parameter file for sealing.
 ///
 #[no_mangle]
-pub unsafe extern "C" fn fil_get_seal_params_cid(
-    registered_proof: fil_RegisteredSealProof,
-) -> *mut fil_StringResponse {
+pub unsafe extern "C" fn fil_get_seal_params_cid(registered_proof: fil_RegisteredSealProof) -> *mut fil_StringResponse {
     registered_seal_proof_accessor(registered_proof, RegisteredSealProof::params_cid)
 }
 
@@ -952,8 +1215,7 @@ pub unsafe extern "C" fn fil_get_seal_params_path(
     registered_proof: fil_RegisteredSealProof,
 ) -> *mut fil_StringResponse {
     registered_seal_proof_accessor(registered_proof, |p| {
-        p.cache_params_path()
-            .map(|pb| String::from(pb.to_string_lossy()))
+        p.cache_params_path().map(|pb| String::from(pb.to_string_lossy()))
     })
 }
 
@@ -982,18 +1244,14 @@ pub unsafe extern "C" fn fil_get_seal_circuit_identifier(
 /// Returns the version of the provided seal proof type.
 ///
 #[no_mangle]
-pub unsafe extern "C" fn fil_get_seal_version(
-    registered_proof: fil_RegisteredSealProof,
-) -> *mut fil_StringResponse {
+pub unsafe extern "C" fn fil_get_seal_version(registered_proof: fil_RegisteredSealProof) -> *mut fil_StringResponse {
     registered_seal_proof_accessor(registered_proof, |p| Ok(format!("{:?}", p)))
 }
 
 /// Returns the CID of the Groth parameter file for generating a PoSt.
 ///
 #[no_mangle]
-pub unsafe extern "C" fn fil_get_post_params_cid(
-    registered_proof: fil_RegisteredPoStProof,
-) -> *mut fil_StringResponse {
+pub unsafe extern "C" fn fil_get_post_params_cid(registered_proof: fil_RegisteredPoStProof) -> *mut fil_StringResponse {
     registered_post_proof_accessor(registered_proof, RegisteredPoStProof::params_cid)
 }
 
@@ -1014,8 +1272,7 @@ pub unsafe extern "C" fn fil_get_post_params_path(
     registered_proof: fil_RegisteredPoStProof,
 ) -> *mut fil_StringResponse {
     registered_post_proof_accessor(registered_proof, |p| {
-        p.cache_params_path()
-            .map(|pb| String::from(pb.to_string_lossy()))
+        p.cache_params_path().map(|pb| String::from(pb.to_string_lossy()))
     })
 }
 
@@ -1044,9 +1301,7 @@ pub unsafe extern "C" fn fil_get_post_circuit_identifier(
 /// Returns the version of the provided seal proof.
 ///
 #[no_mangle]
-pub unsafe extern "C" fn fil_get_post_version(
-    registered_proof: fil_RegisteredPoStProof,
-) -> *mut fil_StringResponse {
+pub unsafe extern "C" fn fil_get_post_version(registered_proof: fil_RegisteredPoStProof) -> *mut fil_StringResponse {
     registered_post_proof_accessor(registered_proof, |p| Ok(format!("{:?}", p)))
 }
 
@@ -1102,39 +1357,29 @@ pub unsafe extern "C" fn fil_destroy_verify_seal_response(ptr: *mut fil_VerifySe
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_finalize_ticket_response(
-    ptr: *mut fil_FinalizeTicketResponse,
-) {
+pub unsafe extern "C" fn fil_destroy_finalize_ticket_response(ptr: *mut fil_FinalizeTicketResponse) {
     let _ = Box::from_raw(ptr);
 }
 
 /// Deallocates a VerifyPoStResponse.
 ///
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_verify_winning_post_response(
-    ptr: *mut fil_VerifyWinningPoStResponse,
-) {
+pub unsafe extern "C" fn fil_destroy_verify_winning_post_response(ptr: *mut fil_VerifyWinningPoStResponse) {
     let _ = Box::from_raw(ptr);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_verify_window_post_response(
-    ptr: *mut fil_VerifyWindowPoStResponse,
-) {
+pub unsafe extern "C" fn fil_destroy_verify_window_post_response(ptr: *mut fil_VerifyWindowPoStResponse) {
     let _ = Box::from_raw(ptr);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_generate_winning_post_response(
-    ptr: *mut fil_GenerateWinningPoStResponse,
-) {
+pub unsafe extern "C" fn fil_destroy_generate_winning_post_response(ptr: *mut fil_GenerateWinningPoStResponse) {
     let _ = Box::from_raw(ptr);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fil_destroy_generate_window_post_response(
-    ptr: *mut fil_GenerateWindowPoStResponse,
-) {
+pub unsafe extern "C" fn fil_destroy_generate_window_post_response(ptr: *mut fil_GenerateWindowPoStResponse) {
     let _ = Box::from_raw(ptr);
 }
 
@@ -1260,37 +1505,19 @@ pub mod tests {
         unsafe {
             for st in seal_types {
                 pairs.push(("get_seal_params_cid", fil_get_seal_params_cid(st)));
-                pairs.push((
-                    "get_seal_verify_key_cid",
-                    fil_get_seal_verifying_key_cid(st),
-                ));
+                pairs.push(("get_seal_verify_key_cid", fil_get_seal_verifying_key_cid(st)));
                 pairs.push(("get_seal_verify_key_cid", fil_get_seal_params_path(st)));
-                pairs.push((
-                    "get_seal_verify_key_cid",
-                    fil_get_seal_verifying_key_path(st),
-                ));
-                pairs.push((
-                    "get_seal_circuit_identifier",
-                    fil_get_seal_circuit_identifier(st),
-                ));
+                pairs.push(("get_seal_verify_key_cid", fil_get_seal_verifying_key_path(st)));
+                pairs.push(("get_seal_circuit_identifier", fil_get_seal_circuit_identifier(st)));
                 pairs.push(("get_seal_version", fil_get_seal_version(st)));
             }
 
             for pt in post_types {
                 pairs.push(("get_post_params_cid", fil_get_post_params_cid(pt)));
-                pairs.push((
-                    "get_post_verify_key_cid",
-                    fil_get_post_verifying_key_cid(pt),
-                ));
+                pairs.push(("get_post_verify_key_cid", fil_get_post_verifying_key_cid(pt)));
                 pairs.push(("get_post_params_path", fil_get_post_params_path(pt)));
-                pairs.push((
-                    "get_post_verifying_key_path",
-                    fil_get_post_verifying_key_path(pt),
-                ));
-                pairs.push((
-                    "get_post_circuit_identifier",
-                    fil_get_post_circuit_identifier(pt),
-                ));
+                pairs.push(("get_post_verifying_key_path", fil_get_post_verifying_key_path(pt)));
+                pairs.push(("get_post_circuit_identifier", fil_get_post_circuit_identifier(pt)));
                 pairs.push(("get_post_version", fil_get_post_version(pt)));
             }
         }
@@ -1362,12 +1589,7 @@ pub mod tests {
         let staged_sector_fd = staged_file.into_raw_fd();
 
         unsafe {
-            let resp_a1 = fil_write_without_alignment(
-                registered_proof_seal,
-                piece_file_a_fd,
-                127,
-                staged_sector_fd,
-            );
+            let resp_a1 = fil_write_without_alignment(registered_proof_seal, piece_file_a_fd, 127, staged_sector_fd);
 
             if (*resp_a1).status_code != FCPResponseStatus::FCPNoError {
                 let msg = c_str_to_rust_str((*resp_a1).error_msg);
@@ -1401,8 +1623,7 @@ pub mod tests {
                 },
             ];
 
-            let resp_x =
-                fil_generate_data_commitment(registered_proof_seal, pieces.as_ptr(), pieces.len());
+            let resp_x = fil_generate_data_commitment(registered_proof_seal, pieces.as_ptr(), pieces.len());
 
             if (*resp_x).status_code != FCPResponseStatus::FCPNoError {
                 let msg = c_str_to_rust_str((*resp_x).error_msg);
@@ -1578,12 +1799,8 @@ pub mod tests {
 
             // winning post
 
-            let resp_h = fil_generate_winning_post(
-                randomness,
-                private_replicas.as_ptr(),
-                private_replicas.len(),
-                prover_id,
-            );
+            let resp_h =
+                fil_generate_winning_post(randomness, private_replicas.as_ptr(), private_replicas.len(), prover_id);
 
             if (*resp_h).status_code != FCPResponseStatus::FCPNoError {
                 let msg = c_str_to_rust_str((*resp_h).error_msg);
@@ -1623,12 +1840,8 @@ pub mod tests {
                 sector_id,
             }];
 
-            let resp_j = fil_generate_window_post(
-                randomness,
-                private_replicas.as_ptr(),
-                private_replicas.len(),
-                prover_id,
-            );
+            let resp_j =
+                fil_generate_window_post(randomness, private_replicas.as_ptr(), private_replicas.len(), prover_id);
 
             if (*resp_j).status_code != FCPResponseStatus::FCPNoError {
                 let msg = c_str_to_rust_str((*resp_j).error_msg);

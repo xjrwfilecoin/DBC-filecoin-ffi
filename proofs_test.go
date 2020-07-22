@@ -3,6 +3,7 @@ package ffi
 import (
 	"bytes"
 	"crypto/rand"
+	"github.com/filecoin-project/filecoin-ffi/generated"
 	"io"
 	"io/ioutil"
 	"math/big"
