@@ -1137,7 +1137,6 @@ pub unsafe extern "C" fn fil_destroy_write_without_alignment_response(ptr: *mut 
 }
 
 #[no_mangle]
-<<<<<<< HEAD
 pub unsafe extern "C" fn fil_destroy_fauxrep_response(ptr: *mut fil_FauxRepResponse) {
     let _ = Box::from_raw(ptr);
 }
