@@ -8,10 +8,6 @@ use filecoin_proofs_api::{PrivateReplicaInfo, PublicReplicaInfo, SectorId};
 
 use super::types::{fil_PrivateReplicaInfo, fil_PublicReplicaInfo, fil_RegisteredPoStProof};
 use crate::proofs::types::{fil_PoStProof, PoStProof};
-use filecoin_webapi::types::{
-    WebPrivateReplica, WebPrivateReplicaInfo, WebPrivateReplicas, WebPublicReplica, WebPublicReplicaInfo,
-    WebPublicReplicas,
-};
 
 #[derive(Debug, Clone)]
 struct PublicReplicaInfoTmp {
@@ -41,21 +37,21 @@ struct PublicReplicaInfoTmp {
 //         });
 //     }
 
-    // let map = replicas
-    //     .into_par_iter()
-    //     .map(|info| {
-    //         let PublicReplicaInfoTmp {
-    //             registered_proof,
-    //             comm_r,
-    //             sector_id,
-    //         } = info;
-    //
-    //         (
-    //             SectorId::from(sector_id),
-    //             PublicReplicaInfo::new(registered_proof.into(), comm_r),
-    //         )
-    //     })
-    //     .collect();
+// let map = replicas
+//     .into_par_iter()
+//     .map(|info| {
+//         let PublicReplicaInfoTmp {
+//             registered_proof,
+//             comm_r,
+//             sector_id,
+//         } = info;
+//
+//         (
+//             SectorId::from(sector_id),
+//             PublicReplicaInfo::new(registered_proof.into(), comm_r),
+//         )
+//     })
+//     .collect();
 
 //     Ok(WebPublicReplicas(replicas))
 // }
@@ -134,28 +130,28 @@ struct PrivateReplicaInfoTmp {
 //         })
 //         .collect();
 
-    // let map = replicas
-    //     .into_par_iter()
-    //     .map(|info| {
-    //         let WebPrivateReplicaInfo {
-    //             registered_proof,
-    //             cache_dir_path,
-    //             comm_r,
-    //             replica_path,
-    //             sector_id,
-    //         } = info;
-    //
-    //         (
-    //             SectorId::from(sector_id),
-    //             PrivateReplicaInfo::new(
-    //                 registered_proof.into(),
-    //                 comm_r,
-    //                 cache_dir_path,
-    //                 replica_path,
-    //             ),
-    //         )
-    //     })
-    //     .collect();
+// let map = replicas
+//     .into_par_iter()
+//     .map(|info| {
+//         let WebPrivateReplicaInfo {
+//             registered_proof,
+//             cache_dir_path,
+//             comm_r,
+//             replica_path,
+//             sector_id,
+//         } = info;
+//
+//         (
+//             SectorId::from(sector_id),
+//             PrivateReplicaInfo::new(
+//                 registered_proof.into(),
+//                 comm_r,
+//                 cache_dir_path,
+//                 replica_path,
+//             ),
+//         )
+//     })
+//     .collect();
 
 //     Ok(WebPrivateReplicas(replicas))
 // }

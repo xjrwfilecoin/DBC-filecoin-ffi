@@ -96,12 +96,7 @@ mod tests {
 
             let devices: Vec<String> = strings
                 .iter_mut()
-                .map(|s| {
-                    std::ffi::CStr::from_ptr(*s)
-                        .to_str()
-                        .unwrap_or("Unknown")
-                        .to_owned()
-                })
+                .map(|s| std::ffi::CStr::from_ptr(*s).to_str().unwrap_or("Unknown").to_owned())
                 .collect();
 
             assert_eq!(devices.len(), (*resp).devices_len);

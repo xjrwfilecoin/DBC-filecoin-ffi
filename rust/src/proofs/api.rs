@@ -1,29 +1,89 @@
-use ffi_toolkit::{
-    c_str_to_pbuf, c_str_to_rust_str, catch_panic_response, raw_ptr, rust_str_to_c_str, FCPResponseStatus,
-};
-use filecoin_proofs_api::seal::{SealCommitPhase1Output, SealCommitPhase2Output, SealPreCommitPhase2Output};
+use ffi_toolkit::{c_str_to_pbuf, catch_panic_response, raw_ptr, rust_str_to_c_str, FCPResponseStatus};
+use filecoin_proofs_api::seal::{SealCommitPhase2Output, SealPreCommitPhase2Output};
 use filecoin_proofs_api::{
-    PaddedBytesAmount, PieceInfo, RegisteredPoStProof, RegisteredSealProof, SectorId, SnarkProof, UnpaddedByteIndex,
-    UnpaddedBytesAmount,
+    PieceInfo, RegisteredPoStProof, RegisteredSealProof, SectorId, UnpaddedByteIndex, UnpaddedBytesAmount,
 };
 use filecoin_webapi::*;
-use log::{warn, info, trace};
+use log::info;
 use std::env;
 use std::mem;
-use std::fs;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::slice::from_raw_parts;
+use std::sync::Mutex;
 
-use super::helpers::{
-    c_to_rust_post_proofs, to_private_replica_info_map, to_public_replica_info_map,
-};
+use super::helpers::{c_to_rust_post_proofs, to_private_replica_info_map};
 use super::types::*;
-// use crate::proofs::helpers::to_web_public_replica_info_map;
 use crate::util::api::init_log;
-use crate::util::rpc::webapi_upload;
-use filecoin_webapi::types::{WebPieceInfo, WebPrivateReplica, WebPrivateReplicas};
-use serde_json::{json, Value, from_value};
-// use crate::util::rpc::post_builder;
+use serde_json::json;
+use tarpc::{client, context};
+use tokio::runtime::Runtime;
+use tokio_serde::formats::Json;
+
+lazy_static! {
+    static ref RPC_CLIENT: Mutex<SchedulerClient> = {
+        let r = async {
+            let server_addr: SocketAddr = "127.0.0.1:6000".parse().unwrap();
+            let transport = tarpc::serde_transport::tcp::connect(server_addr, Json::default())
+                .await
+                .unwrap();
+            SchedulerClient::new(client::Config::default(), transport)
+                .spawn()
+                .unwrap()
+        };
+
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let client = rt.block_on(r);
+
+        Mutex::new(client)
+    };
+}
+
+#[tarpc::service]
+pub trait Scheduler {
+    async fn get_cond(cond: String) -> Option<u64>;
+    async fn remove_guard(token: u64) -> Option<bool>;
+}
+
+struct TokenGuard(u64);
+
+impl TokenGuard {
+    fn new(token: u64) -> Self {
+        TokenGuard(token)
+    }
+}
+
+impl std::ops::Drop for TokenGuard {
+    fn drop(&mut self) {
+        let mut client = RPC_CLIENT.lock().unwrap();
+        let r = async { client.remove_guard(tarpc::context::current(), self.0).await.unwrap() };
+
+        let mut rt = Runtime::new().unwrap();
+        rt.block_on(r);
+    }
+}
+
+macro_rules! wait_cond {
+    ($cond:expr, $time:expr) => {{
+        let r = async {
+            loop {
+                let x = {
+                    let mut client = RPC_CLIENT.lock().unwrap();
+                    client.get_cond(context::current(), $cond).await
+                };
+
+                if let Ok(Some(t)) = x {
+                    return t;
+                }
+
+                std::thread::sleep(std::time::Duration::from_secs($time));
+            }
+        };
+
+        let mut rt = Runtime::new().unwrap();
+        TokenGuard::new(rt.block_on(r))
+    }};
+}
 
 /// TODO: document
 ///
@@ -171,6 +231,8 @@ pub unsafe extern "C" fn fil_seal_pre_commit_phase1(
 
         info!("seal_pre_commit_phase1: start");
 
+        let _guard = wait_cond!("P1".to_string(), 30);
+
         let public_pieces: Vec<PieceInfo> = from_raw_parts(pieces_ptr, pieces_len)
             .iter()
             .cloned()
@@ -223,6 +285,8 @@ pub unsafe extern "C" fn fil_seal_pre_commit_phase2(
         init_log();
 
         info!("seal_pre_commit_phase2: start");
+
+        let _guard = wait_cond!("P2".to_string(), 30);
 
         let mut response: fil_SealPreCommitPhase2Response = Default::default();
 
@@ -279,6 +343,8 @@ pub unsafe extern "C" fn fil_seal_commit_phase1(
         init_log();
 
         info!("seal_commit_phase1: start");
+
+        let _guard = wait_cond!("C1".to_string(), 30);
 
         let mut response = fil_SealCommitPhase1Response::default();
 
@@ -360,35 +426,35 @@ pub unsafe extern "C" fn fil_seal_commit_phase1(
         //         }
         //     }
         // } else {
-            let public_pieces: Vec<PieceInfo> = from_raw_parts(pieces_ptr, pieces_len)
-                .iter()
-                .cloned()
-                .map(Into::into)
-                .collect();
+        let public_pieces: Vec<PieceInfo> = from_raw_parts(pieces_ptr, pieces_len)
+            .iter()
+            .cloned()
+            .map(Into::into)
+            .collect();
 
-            let result = filecoin_proofs_api::seal::seal_commit_phase1(
-                c_str_to_pbuf(cache_dir_path),
-                c_str_to_pbuf(replica_path),
-                prover_id.inner,
-                SectorId::from(sector_id),
-                ticket.inner,
-                seed.inner,
-                spcp2o,
-                &public_pieces,
-            );
+        let result = filecoin_proofs_api::seal::seal_commit_phase1(
+            c_str_to_pbuf(cache_dir_path),
+            c_str_to_pbuf(replica_path),
+            prover_id.inner,
+            SectorId::from(sector_id),
+            ticket.inner,
+            seed.inner,
+            spcp2o,
+            &public_pieces,
+        );
 
-            match result.and_then(|output| serde_json::to_vec(&output).map_err(Into::into)) {
-                Ok(output) => {
-                    response.status_code = FCPResponseStatus::FCPNoError;
-                    response.seal_commit_phase1_output_ptr = output.as_ptr();
-                    response.seal_commit_phase1_output_len = output.len();
-                    mem::forget(output);
-                }
-                Err(err) => {
-                    response.status_code = FCPResponseStatus::FCPUnclassifiedError;
-                    response.error_msg = rust_str_to_c_str(format!("{:?}", err));
-                }
+        match result.and_then(|output| serde_json::to_vec(&output).map_err(Into::into)) {
+            Ok(output) => {
+                response.status_code = FCPResponseStatus::FCPNoError;
+                response.seal_commit_phase1_output_ptr = output.as_ptr();
+                response.seal_commit_phase1_output_len = output.len();
+                mem::forget(output);
             }
+            Err(err) => {
+                response.status_code = FCPResponseStatus::FCPUnclassifiedError;
+                response.error_msg = rust_str_to_c_str(format!("{:?}", err));
+            }
+        }
         // }
 
         info!("seal_commit_phase1: finish");
@@ -408,6 +474,8 @@ pub unsafe extern "C" fn fil_seal_commit_phase2(
         init_log();
 
         info!("seal_commit_phase2: start");
+
+        let _guard = wait_cond!("C2".to_string(), 30);
 
         let mut response = fil_SealCommitPhase2Response::default();
 
