@@ -21,6 +21,7 @@ use tokio::runtime::Runtime;
 use tokio_serde::formats::Json;
 
 lazy_static! {
+    static ref RUNTIME: Mutex<Runtime> = { Mutex::new(Runtime::new().unwrap()) };
     static ref RPC_CLIENT: Mutex<SchedulerClient> = {
         let r = async {
             let server_addr: SocketAddr = "127.0.0.1:6000".parse().unwrap();
@@ -32,7 +33,7 @@ lazy_static! {
                 .unwrap()
         };
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = RUNTIME.lock().unwrap();
         let client = rt.block_on(r);
 
         Mutex::new(client)
@@ -56,22 +57,18 @@ impl TokenGuard {
 impl std::ops::Drop for TokenGuard {
     fn drop(&mut self) {
         let mut client = RPC_CLIENT.lock().unwrap();
-        let r = async { client.remove_guard(tarpc::context::current(), self.0).await.unwrap() };
-
-        let mut rt = Runtime::new().unwrap();
+        let r = async { client.remove_guard(context::current(), self.0).await.unwrap() };
+        let mut rt = RUNTIME.lock().unwrap();
         rt.block_on(r);
     }
 }
 
 macro_rules! wait_cond {
     ($cond:expr, $time:expr) => {{
+        let mut client = RPC_CLIENT.lock().unwrap();
         let r = async {
             loop {
-                let x = {
-                    let mut client = RPC_CLIENT.lock().unwrap();
-                    client.get_cond(context::current(), $cond).await
-                };
-
+                let x = client.get_cond(context::current(), $cond).await;
                 if let Ok(Some(t)) = x {
                     return t;
                 }
@@ -80,7 +77,7 @@ macro_rules! wait_cond {
             }
         };
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = RUNTIME.lock().unwrap();
         TokenGuard::new(rt.block_on(r))
     }};
 }
