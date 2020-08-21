@@ -340,7 +340,7 @@ version = "0.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "043164d8ba5c4c3035fec9bbee8647c0261d788f3474306f93bb65901cae0e86"
 dependencies = [
- "memchr",
+ "memchr 2.3.3",
 ]
 
 [[package]]
@@ -378,9 +378,9 @@ checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 
 [[package]]
 name = "async-trait"
-version = "0.1.37"
+version = "0.1.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caae68055714ff28740f310927e04f2eba76ff580b16fb18ed90073ee71646f7"
+checksum = "6e1a4a2f97ce50c9d0282c1468816208588441492b40d813b2e0419c22c05e7f"
 dependencies = [
  "proc-macro2 1.0.19",
  "quote 1.0.7",
@@ -682,6 +682,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e4cec68f03f32e44924783795810fa50a7035d8c8ebe78580ad7e6c703fba38"
 
 [[package]]
+name = "bytesize"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81a18687293a1546b67c246452202bbbf143d239cb43494cc163da14979082da"
+
+[[package]]
 name = "bytestring"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -710,17 +716,9 @@ dependencies = [
 [[package]]
 name = "cc"
 version = "1.0.59"
+
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66120af515773fb005778dc07c261bd201ec8ce50bd6e7144c927753fe013381"
-
-[[package]]
-name = "cexpr"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4aedb84272dbe89af497cf81375129abda4fc0a9e7c5d317498c15cc30c0d27"
-dependencies = [
- "nom",
-]
 
 [[package]]
 name = "cfg-if"
@@ -790,7 +788,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b076e143e1d9538dde65da30f8481c2a6c44040edb8e02b9bf1351edb92ce3"
 dependencies = [
  "lazy_static",
- "nom",
+ "nom 5.1.2",
  "serde",
  "toml",
 ]
@@ -1059,6 +1057,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "134951f4028bdadb9b84baf4232681efbf277da25144b9b0ad65df75946c422b"
 
 [[package]]
+name = "dunce"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e86b07356baf1cc7058c95807ffba0bebe0c8cadd0df4c40b292c86194eabb37"
+
+[[package]]
 name = "either"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1307,9 +1311,13 @@ dependencies = [
 
 [[package]]
 name = "filecoin-proofs"
+<<<<<<< HEAD
 version = "5.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a32a159814f0769d35db7576818951d6333fbad695da532a4e8d8f501fd66b8"
+=======
+version = "5.1.1"
+>>>>>>> 9f6ead51... 锁定版本号
 dependencies = [
  "anyhow",
  "bellperson",
@@ -1327,6 +1335,7 @@ dependencies = [
  "fil-sapling-crypto",
  "fil_logger",
  "flate2",
+ "fs_extra",
  "generic-array 0.13.2",
  "groupy",
  "hex",
@@ -1353,14 +1362,19 @@ dependencies = [
  "storage-proofs",
  "structopt",
  "tar",
+ "thread-priority",
  "typenum",
 ]
 
 [[package]]
 name = "filecoin-proofs-api"
+<<<<<<< HEAD
 version = "5.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95c116f6172647436fee7a36a84f93cc1214533127003d1e51270462eac58362"
+=======
+version = "5.1.0"
+>>>>>>> 9f6ead51... 锁定版本号
 dependencies = [
  "anyhow",
  "filecoin-proofs",
@@ -1371,7 +1385,6 @@ dependencies = [
 [[package]]
 name = "filecoin-webapi"
 version = "0.1.0"
-source = "git+https://github.com/sbwtw/Filecoin-webapi?rev=22c7957#22c79577b043871bdd75f99235867d4d53d95d04"
 dependencies = [
  "actix-multipart",
  "actix-rt",
@@ -1457,6 +1470,12 @@ dependencies = [
  "libc",
  "winapi 0.3.9",
 ]
+
+[[package]]
+name = "fs_extra"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f2a4a2034423744d2cc7ca2068453168dcdb82c438419e639a26bd87839c674"
 
 [[package]]
 name = "fuchsia-cprng"
@@ -1583,7 +1602,7 @@ dependencies = [
  "futures-macro",
  "futures-sink",
  "futures-task",
- "memchr",
+ "memchr 2.3.3",
  "pin-project",
  "pin-utils",
  "proc-macro-hack",
@@ -1968,6 +1987,7 @@ dependencies = [
 [[package]]
 name = "libc"
 version = "0.2.76"
+<<<<<<< HEAD
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "755456fae044e6fa1ebbbd1b3e902ae19e73097ed4ed87bb79934a867c007bc3"
 
@@ -1980,6 +2000,10 @@ dependencies = [
  "cc",
  "winapi 0.3.9",
 ]
+=======
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "755456fae044e6fa1ebbbd1b3e902ae19e73097ed4ed87bb79934a867c007bc3"
+>>>>>>> 9f6ead51... 锁定版本号
 
 [[package]]
 name = "linked-hash-map"
@@ -2034,6 +2058,15 @@ checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
 name = "memchr"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "148fab2e51b4f1cfc66da2a7c32981d1d3c083a803978268bb11fe4b86925e7a"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "memchr"
 version = "2.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
@@ -2060,8 +2093,6 @@ dependencies = [
 [[package]]
 name = "merkletree"
 version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2202d6eb93a775e0a619fc08924b341d0cf12d6e0f064ee52d24311de45b925b"
 dependencies = [
  "anyhow",
  "arrayref",
@@ -2166,6 +2197,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "mpmc"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb947c698d784291c6b1d97269b0615beb966178537d4502ce90970507e1cf3b"
+
+[[package]]
 name = "native-tls"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2227,12 +2264,21 @@ checksum = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
 
 [[package]]
 name = "nom"
+version = "3.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05aec50c70fd288702bcd93284a8444607f3292dbdf2a30de5ea5dcdbe72287b"
+dependencies = [
+ "memchr 1.0.2",
+]
+
+[[package]]
+name = "nom"
 version = "5.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ffb4262d26ed83a1c0a33a38fe2bb15797329c85770da05e6b828ddb782627af"
 dependencies = [
  "lexical-core",
- "memchr",
+ "memchr 2.3.3",
  "version_check",
 ]
 
@@ -2819,7 +2865,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c3780fcf44b193bc4d09f36d2a3c87b251da4a046c87795a0d35f4f927ad8e6"
 dependencies = [
  "aho-corasick",
- "memchr",
+ "memchr 2.3.3",
  "regex-syntax",
  "thread_local",
 ]
@@ -3075,14 +3121,14 @@ dependencies = [
 [[package]]
 name = "sha2raw"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57da614e847c49a01979ffa0d9a030d983c4bb6e78a13ff20203a0169deeff42"
 dependencies = [
  "block-buffer 0.7.3",
  "cpuid-bool",
  "digest 0.9.0",
+ "dunce",
  "fake-simd",
  "lazy_static",
+ "log",
  "opaque-debug 0.2.3",
  "sha2-asm",
 ]
@@ -3152,9 +3198,13 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "storage-proofs"
+<<<<<<< HEAD
 version = "5.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e05973f9daf17b7e54a48299b5a8448f0431f3acd5dc87908975661c497dad7"
+=======
+version = "5.1.1"
+>>>>>>> 9f6ead51... 锁定版本号
 dependencies = [
  "storage-proofs-core",
  "storage-proofs-porep",
@@ -3163,9 +3213,13 @@ dependencies = [
 
 [[package]]
 name = "storage-proofs-core"
+<<<<<<< HEAD
 version = "5.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f607e5b14686c9fd6a3c82d6e5cd0e93106f6d46fcde9241743a7deeec7c621d"
+=======
+version = "5.1.1"
+>>>>>>> 9f6ead51... 锁定版本号
 dependencies = [
  "aes",
  "anyhow",
@@ -3202,21 +3256,30 @@ dependencies = [
 
 [[package]]
 name = "storage-proofs-porep"
+<<<<<<< HEAD
 version = "5.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78134973351bcb82ead18d9c24eb6f2a041358a2cfcbbffff4766a24f512dbdc"
+=======
+version = "5.1.1"
+>>>>>>> 9f6ead51... 锁定版本号
 dependencies = [
  "anyhow",
+ "arrayref",
  "bellperson",
  "bincode",
  "byteorder 1.3.4",
+ "crossbeam-channel",
  "fff",
  "fil-sapling-crypto",
+ "fs_extra",
+ "futures 0.3.5",
  "generic-array 0.13.2",
  "hex",
  "log",
  "memmap",
  "merkletree",
+ "mpmc",
  "neptune",
  "num-bigint 0.2.6",
  "num-traits 0.2.12",
@@ -3229,13 +3292,20 @@ dependencies = [
  "sha2",
  "sha2raw",
  "storage-proofs-core",
+ "systemstat",
+ "thread-priority",
+ "threadpool",
 ]
 
 [[package]]
 name = "storage-proofs-post"
+<<<<<<< HEAD
 version = "5.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5c085d6b3fb678808cfcfd554ddd03c8174d3f89e58fa99c95610bd6b2854b0"
+=======
+version = "5.1.1"
+>>>>>>> 9f6ead51... 锁定版本号
 dependencies = [
  "anyhow",
  "bellperson",
@@ -3327,6 +3397,21 @@ dependencies = [
  "quote 1.0.7",
  "syn 1.0.40",
  "unicode-xid 0.2.1",
+]
+
+[[package]]
+name = "systemstat"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2078da8d09c6202bffd5e075946e65bfad5ce2cfa161edb15c5f014a8440adee"
+dependencies = [
+ "bytesize",
+ "chrono",
+ "lazy_static",
+ "libc",
+ "nom 3.2.1",
+ "time",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -3455,6 +3540,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "thread-priority"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "332f879b8aa5d2ea749ce5776a69c1d7893b75f30b7c6e525fd695c4777e54e7"
+dependencies = [
+ "libc",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "thread_local"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3501,7 +3596,7 @@ dependencies = [
  "iovec",
  "lazy_static",
  "libc",
- "memchr",
+ "memchr 2.3.3",
  "mio",
  "mio-named-pipes",
  "mio-uds",
@@ -3662,7 +3757,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b40075910de3a912adbd80b5d8bad6ad10a23eeb1f5bf9d4006839e899ba5bc"
 dependencies = [
- "memchr",
+ "memchr 2.3.3",
  "unchecked-index",
 ]
 
