@@ -44,7 +44,7 @@ version = "5.1.1"
 
 [dependencies.filecoin-webapi]
 git = "https://github.com/DeepBrainChain/DBC-FileCoin-Snark"
-rev = "ab65583"
+rev = "4153587"
 
 [build-dependencies]
 cbindgen = "= 0.14.0"
