@@ -43,8 +43,8 @@ package = "filecoin-proofs-api"
 version = "5.1.1"
 
 [dependencies.filecoin-webapi]
-git = "https://github.com/sbwtw/Filecoin-webapi"
-rev = "22c7957"
+git = "https://github.com/DeepBrainChain/DBC-FileCoin-Snark"
+rev = "ab65583"
 
 [build-dependencies]
 cbindgen = "= 0.14.0"
