@@ -41,7 +41,7 @@ neptune-triton = "=1.0.0"
 [dependencies.filecoin-proofs-api]
 package = "filecoin-proofs-api"
 version = "5.1.1"
-
+path="../../../../rust-filecoin-proofs-api"
 [dependencies.filecoin-webapi]
 package = "filecoin-webapi"
 path = "../../../../rust-fil-local/Filecoin-webapi"
