@@ -26,7 +26,7 @@ rand = "0.7"
 rand_chacha = "0.2.1"
 rayon = "1.2.1"
 anyhow = "1.0.23"
-bellperson = { version = "0.9.2", features = ["gpu"], path="../../../../rust-fil-local/bellman"}
+bellperson = { version = "0.9.2", features = ["gpu"], path="../../../../rust-fil-local/belllperson"}
 serde_json = "1.0.46"
 serde = "^1.0"
 lazy_static = "^1.4"
@@ -40,14 +40,18 @@ neptune-triton = "=1.0.0"
 
 [dependencies.filecoin-proofs-api]
 package = "filecoin-proofs-api"
-version = "5.1.1"
-path="../../../../rust-filecoin-proofs-api"
+version = "5.4.0"
+path = "../../../../rust-filecoin-proofs-api/"
+
+
 [dependencies.filecoin-webapi]
 package = "filecoin-webapi"
 path = "../../../../rust-fil-local/Filecoin-webapi"
+
 
 [build-dependencies]
 cbindgen = "= 0.14.0"
 
 [dev-dependencies]
 tempfile = "3.0.8"
+

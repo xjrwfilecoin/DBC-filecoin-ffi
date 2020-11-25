@@ -13,18 +13,16 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	commcid "github.com/filecoin-project/go-fil-commcid"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/specs-actors/actors/runtime/proof"
+	"github.com/filecoin-project/specs-actors/actors/abi"
 	"github.com/ipfs/go-cid"
 	"github.com/pkg/errors"
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/filecoin-ffi/generated"
 )
 
 // VerifySeal returns true if the sealing operation from which its inputs were
 // derived was valid, and false if not.
-func VerifySeal(info proof.SealVerifyInfo) (bool, error) {
+func VerifySeal(info abi.SealVerifyInfo) (bool, error) {
 	sp, err := toFilRegisteredSealProof(info.SealProof)
 	if err != nil {
 		return false, err
@@ -59,7 +57,7 @@ func VerifySeal(info proof.SealVerifyInfo) (bool, error) {
 
 // VerifyWinningPoSt returns true if the Winning PoSt-generation operation from which its
 // inputs were derived was valid, and false if not.
-func VerifyWinningPoSt(info proof.WinningPoStVerifyInfo) (bool, error) {
+func VerifyWinningPoSt(info abi.WinningPoStVerifyInfo) (bool, error) {
 	filPublicReplicaInfos, filPublicReplicaInfosLen, err := toFilPublicReplicaInfos(info.ChallengedSectors, "winning")
 	if err != nil {
 		return false, errors.Wrap(err, "failed to create public replica info array for FFI")
@@ -97,7 +95,7 @@ func VerifyWinningPoSt(info proof.WinningPoStVerifyInfo) (bool, error) {
 
 // VerifyWindowPoSt returns true if the Winning PoSt-generation operation from which its
 // inputs were derived was valid, and false if not.
-func VerifyWindowPoSt(info proof.WindowPoStVerifyInfo) (bool, error) {
+func VerifyWindowPoSt(info abi.WindowPoStVerifyInfo) (bool, error) {
 	filPublicReplicaInfos, filPublicReplicaInfosLen, err := toFilPublicReplicaInfos(info.ChallengedSectors, "window")
 	if err != nil {
 		return false, errors.Wrap(err, "failed to create public replica info array for FFI")
@@ -518,7 +516,7 @@ func GenerateWinningPoSt(
 	minerID abi.ActorID,
 	privateSectorInfo SortedPrivateSectorInfo,
 	randomness abi.PoStRandomness,
-) ([]proof.PoStProof, error) {
+) ([]abi.PoStProof, error) {
 	filReplicas, filReplicasLen, free, err := toFilPrivateReplicaInfos(privateSectorInfo.Values(), "winning")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create private replica info array for FFI")
@@ -558,16 +556,16 @@ func GenerateWindowPoSt(
 	minerID abi.ActorID,
 	privateSectorInfo SortedPrivateSectorInfo,
 	randomness abi.PoStRandomness,
-) ([]proof.PoStProof, []abi.SectorNumber, error) {
+) ([]abi.PoStProof, error) {
 	filReplicas, filReplicasLen, free, err := toFilPrivateReplicaInfos(privateSectorInfo.Values(), "window")
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create private replica info array for FFI")
+		return nil, errors.Wrap(err, "failed to create private replica info array for FFI")
 	}
 	defer free()
 
 	proverID, err := toProverID(minerID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	resp := generated.FilGenerateWindowPost(to32ByteArray(randomness), filReplicas, filReplicasLen, proverID)
@@ -577,21 +575,16 @@ func GenerateWindowPoSt(
 
 	defer generated.FilDestroyGenerateWindowPostResponse(resp)
 
-	faultySectors, err := fromFilPoStFaultySectors(resp.FaultySectorsPtr, resp.FaultySectorsLen)
-	if err != nil {
-		return nil, nil, xerrors.Errorf("failed to parse faulty sectors list: %w", err)
-	}
-
 	if resp.StatusCode != generated.FCPResponseStatusFCPNoError {
-		return nil, faultySectors, errors.New(generated.RawString(resp.ErrorMsg).Copy())
+		return nil, errors.New(generated.RawString(resp.ErrorMsg).Copy())
 	}
 
 	proofs, err := fromFilPoStProofs(resp.ProofsPtr)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return proofs, faultySectors, nil
+	return proofs, nil
 }
 
 // GetGPUDevices produces a slice of strings, each representing the name of a
@@ -728,7 +721,7 @@ func toFilPublicPieceInfos(src []abi.PieceInfo) ([]generated.FilPublicPieceInfo,
 	return out, uint(len(out)), nil
 }
 
-func toFilPublicReplicaInfos(src []proof.SectorInfo, typ string) ([]generated.FilPublicReplicaInfo, uint, error) {
+func toFilPublicReplicaInfos(src []abi.SectorInfo, typ string) ([]generated.FilPublicReplicaInfo, uint, error) {
 	out := make([]generated.FilPublicReplicaInfo, len(src))
 
 	for idx := range out {
@@ -803,29 +796,8 @@ func toFilPrivateReplicaInfos(src []PrivateSectorInfo, typ string) ([]generated.
 	}, nil
 }
 
-func fromFilPoStFaultySectors(ptr []uint64, l uint) ([]abi.SectorNumber, error) {
-	if l == 0 {
-		return nil, nil
-	}
-
-	type sliceHeader struct {
-		Data unsafe.Pointer
-		Len  int
-		Cap  int
-	}
-
-	(*sliceHeader)(unsafe.Pointer(&ptr)).Len = int(l) // don't worry about it
-
-	snums := make([]abi.SectorNumber, 0, l)
-	for i := uint(0); i < l; i++ {
-		snums = append(snums, abi.SectorNumber(ptr[i]))
-	}
-
-	return snums, nil
-}
-
-func fromFilPoStProofs(src []generated.FilPoStProof) ([]proof.PoStProof, error) {
-	out := make([]proof.PoStProof, len(src))
+func fromFilPoStProofs(src []generated.FilPoStProof) ([]abi.PoStProof, error) {
+	out := make([]abi.PoStProof, len(src))
 
 	for idx := range out {
 		src[idx].Deref()
@@ -835,7 +807,7 @@ func fromFilPoStProofs(src []generated.FilPoStProof) ([]proof.PoStProof, error) 
 			return nil, err
 		}
 
-		out[idx] = proof.PoStProof{
+		out[idx] = abi.PoStProof{
 			PoStProof:  pp,
 			ProofBytes: []byte(toGoStringCopy(src[idx].ProofPtr, src[idx].ProofLen)),
 		}
@@ -844,7 +816,7 @@ func fromFilPoStProofs(src []generated.FilPoStProof) ([]proof.PoStProof, error) 
 	return out, nil
 }
 
-func toFilPoStProofs(src []proof.PoStProof) ([]generated.FilPoStProof, uint, func(), error) {
+func toFilPoStProofs(src []abi.PoStProof) ([]generated.FilPoStProof, uint, func(), error) {
 	frees := make([]func(), len(src))
 
 	out := make([]generated.FilPoStProof, len(src))
