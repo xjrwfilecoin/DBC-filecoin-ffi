@@ -37,7 +37,7 @@ serde = { version = "*", features = ["derive"] }
 serde_yaml = "*"
 once_cell = "*"
 reqwest = { version = "*", features = ["json", "blocking"] }
-filecoin-webapi = { git = "https://github.com/DeepBrainChain/DBC-FileCoin-Snark", rev = "7b061cd" }
+filecoin-webapi = { path="../../../../DBC-FileCoin-Snark" }
 grpc = "~0.8"
 grpc-protobuf = "*"
 protobuf = "~2"
